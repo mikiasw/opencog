@@ -1,4 +1,7 @@
+import sys
+sys.path.append('/home/mika/opencog/OPENCOG/opencog/opencog/python/web/api/')
 from web.api.apimain import RESTAPI
+#import web.api.apimain
 from opencog.atomspace import AtomSpace, types
 from opencog.utilities import initialize_opencog
 from opencog.type_constructors import *

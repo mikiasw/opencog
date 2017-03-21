@@ -7,6 +7,8 @@ except ImportError:
     from atomspace_remote import AtomSpace, TruthValue, Atom #, Handle
     from atomspace_remote import types, get_type, get_type_name # is_a
 t=types
+import sys
+sys.path.append('/home/mika/opencog/OPENCOG/opencog/opencog/python/utility')
 
 import tree
 
