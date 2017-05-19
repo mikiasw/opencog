@@ -1,0 +1,307 @@
+/**
+ * item location
+ *test for http://wiki.opencog.org/w/The_Pattern_Matcher 
+ * This test is for the example provided at OpenCog Hands On tutorial 
+ * lesson 7 Pattern Matching  http://wiki.opencog.org/w/The_Pattern_Matcher
+ * I have copied the examples and put it in to OPENCOG/atomspace/examples/pattern-matcher/PatternMatcher.scm
+ * 
+ *
+ *
+ */
+
+
+#include <opencog/guile/SchemeEval.h>
+#include <opencog/truthvalue/SimpleTruthValue.h>
+#include <opencog/atomspace/AtomSpace.h>
+#include <opencog/query/BindLinkAPI.h>
+#include <opencog/util/Logger.h>
+#include <opencog/atoms/base/Atom.h>
+#include <opencog/atoms/core/PutLink.h>
+#include <opencog/atoms/execution/Instantiator.h>
+#include <cxxtest/TestSuite.h>
+
+using namespace opencog;
+
+#define al as->add_link
+#define an as->add_node
+
+class PatternMatcherUTest: public CxxTest::TestSuite
+{
+private:
+	AtomSpace *as;
+	SchemeEval* eval;
+
+public:
+	PatternMatcherUTest(void)
+	{
+		// logger().set_level(Logger::FINE);
+		logger().set_print_to_stdout_flag(true);
+		logger().set_timestamp_flag(false);
+
+		as = new AtomSpace();
+		eval = new SchemeEval(as);
+		eval->eval("(use-modules (opencog exec) (opencog query))");
+		eval->eval("(add-to-load-path \"..\")");
+		eval->eval("(add-to-load-path \"../../..\")");
+	}
+
+	~PatternMatcherUTest()
+	{
+		delete as;
+		// Erase the log file if no assertions failed.
+		if (!CxxTest::TestTracker::tracker().suiteFailed())
+				std::remove(logger().get_filename().c_str());
+int rc = CxxTest::TestTracker::tracker().suiteFailed();
+_exit(rc); // XXX hack to avoid double-free in __run_exit_handlers
+	}
+
+	void setUp(void);
+	void tearDown(void);
+
+	void test_SatisfactionLink(void);
+	void test_BindLink(void);
+	void test_GetLink(void);
+	void test_PutLink(void);
+	void test_combining_Get_and_Put_LINK(void);
+	void test_ChoiceLink(void);
+ 
+};
+
+void PatternMatcherUTest::tearDown(void)
+{
+		as->clear();
+}
+
+void PatternMatcherUTest::setUp(void)
+{
+		as->clear();
+		eval->eval("(use-modules (opencog query))");
+}
+
+/**
+ * Basic Pattern Matcher unit test.
+ *
+ * 
+ * Testing specifying a pattern and ground it using cog-satisfy function
+ * The result of running cog-satisfying-set will be a SetLink, that is connecting all Atoms
+ * that matched with pattern
+ */
+
+void PatternMatcherUTest::test_BindLinkSatisfactionLink(void)
+{
+	logger().debug("BEGIN TEST: %s", __FUNCTION__);
+
+	as->clear();
+	eval->eval("(load-from-path \"/home/mika/mika/PatternMatcher.scm\")");
+	// testing grounding pattern using cog-satisfy
+	Handle hgndt = eval->eval_h("(cog-satisfy colornode)");
+	Handle hanst=eval->eval_h("(stv 1 1)");
+
+	printf("Expected this: %s\n", hanst->toString().c_str());
+	printf("Found this answer: %s\n", hgndt->toString().c_str());
+
+	TSM_ASSERT("Didn't get the expected grounding", hans == hgnd);
+	// testing grounding pattern using cog-statisfiying set
+	Handle hgnd = eval->eval_h("(cog-satisfying-set colornode)");
+	Handle hans = eval->eval_h(
+		"(SetLink (ConceptNode \"Blue\") (ConceptNode \"Green\")(ConceptNode \"Red\"))");
+
+	printf("Expected this: %s\n", hans->toString().c_str());
+	printf("Found this answer: %s\n", hgnd->toString().c_str());
+
+	TSM_ASSERT("Didn't get the expected grounding", hans == hgnd);
+
+	logger().debug("END TEST: %s", __FUNCTION__);
+}
+
+/**
+ * This test is for the case where cog-bind function  is used to deliver graph rewrite queries to Atomspace
+ *
+ */
+
+void PatternMatcherUTest::test_BindLink(void)
+{
+	logger().debug("BEGIN TEST: %s", __FUNCTION__);
+
+	eval->eval("(load-from-path \"/home/mika/mika/PatternMatcher.scm\")");
+
+	Handle hgnd = eval->eval_h("(cog-bind rewrite)");
+
+	Handle hans = eval->eval_h("(SetLink"
+	                           "   (InheritanceLink"
+	                           "      (ConceptNode \"fish\")"
+	                           "      (ConceptNode \"Pet\"))"
+	                           "   (InheritanceLink"
+	                           "      (ConceptNode \"dog\")"
+	                           "      (ConceptNode \"Pet\"))"
+	                           "   (InheritanceLink"
+	                           "      (ConceptNode \"fish\")"
+	                           "      (ConceptNode \"Pet\")))");
+ 
+
+	printf("Expected this: %s\n", hans->toString().c_str());
+	printf("Found this answer: %s\n", hgnd->toString().c_str());
+
+	TSM_ASSERT("Didn't get the expected grounding", hans == hgnd);
+
+	logger().debug("END TEST: %s", __FUNCTION__);
+}
+ 
+/**
+* This test is for the case where PutLink is used to write new nodes  and 
+* provides a way to execute write queries in Atomspace using the cog-execute! function
+*
+*/
+
+void PatternMatcherUTest::test_PutLink()
+{
+	logger().info("BEGIN TEST: %s", __FUNCTION__);
+
+	Handle X = N(VARIABLE_NODE, "$X"),
+		primarycolor=N(CONCEPT_NODE, "PrimaryColor")
+		 
+		red = N(CONCEPT_NODE, "Red"),
+		green = N(CONCEPT_NODE, "Green"),
+		blue = N(CONCEPT_NODE, "Blue"),
+		X_primarycolor = L(INHERITANCE_LINK, X, primarycolor),
+		color_set = L(SET_LINK, red,green, blue),
+		// write with PutLink
+		put = L(PUT_LINK, X_primarycolor,color_set);
+
+	Instantiator inst(&_as);
+	Handle putted = inst.execute(put);
+	// the expected result
+	Handle red_primary=L(INHERITANCE_LINK, red, primarycolor),
+	       blue_primary=L(INHERITANCE_LINK, blue, primarycolor),
+	       green_primary=L(INHERITANCE_LINK, green, primarycolor);
+	// to be finished after running the scim file
+
+	Handle expected = L(SET_LINK, red_primary, blue_primary, green_primary);
+
+	printf("Expecting %s\n", expected->toString().c_str());
+	printf("Got %s\n", putted->toString().c_str());
+	TS_ASSERT_EQUALS(putted, expected);
+    
+    // checking that the node was written
+	Handle c=N(VARIABLE_NODE, "$color"),
+			concept=N(TYPED_NODE, "ConceptNode"),
+			color=N(CONCEPT_NODE, "PrimaryColor"),
+			c_concept=L(TYPED_VARIABLE_LINK, c, concept),
+
+			col_concept=L(INHERITANCE_LINK, c, color),
+			red=N(CONCEPT_NODE, "Red"),
+			blue=N(CONCEPT_NODE, "Blue"),
+			green=N(CONCEPT_NODE, "Green"),
+			getlink=L(GET_LINK, c_concept, col_concept);
+
+	Handle checker=inst.execute(getlink);
+	Handle checker_expected=L(SET_LINK, blue, green, red);
+	printf("Expecting %s\n", checker_expected->toString().c_str());
+	printf("Got %s\n", checker->toString().c_str());
+	TS_ASSERT_EQUALS(checker, checker_expected);
+
+	logger().info("END TEST: %s", __FUNCTION__);
+}
+
+ 
+/**
+* This test is for the case where GetLink is used to get the Nodes that are
+* to be used to ground the pattern in PutLink from the Atomspace
+*/
+
+void PatternMatcherUTest :: test_combining_Get_and_Put_LINK(void)
+{
+
+logger().info("BEGIN TEST: %s", __FUNCTION__);
+Handle X = N(VARIABLE_NODE, "$X"),
+	  pcolor=N(CONCEPT_NODE, "PrimaryColor"),
+	  c=N(VARIABLE_NODE, "$color"),
+	  concept=N(TYPED_NODE, "ConceptNode"),
+	  col=N(CONCEPT_NODE, "Color"),
+		// The pattern to be written to Atomspace 
+		X_color = L(INHERITANCE_LINK, X, pcolor),
+		// variable declaration
+		c_concept=L(TYPED_VARIABLE_LINK, c, concept),
+		// pattern
+		c_col = L(INHERITANCE_LINK, c, color),
+		
+		// The GetLink to search the Atomspace for grounding nodes
+		getlink=L(GET_LINK, c_concept, c_col),
+
+		put=L(PUT_LINK, X_color, getlink);
+
+ 
+
+	Instantiator inst(&_as);
+	Handle putted = inst.execute(put);
+	Handle red_primary=L(INHERITANCE_LINK, red, primarycolor),
+	       blue_primary=L(INHERITANCE_LINK, blue, primarycolor),
+	       green_primary=L(INHERITANCE_LINK, green, primarycolor);
+	// expected result
+
+	Handle expected = L(SET_LINK, red_primary, blue_primary, green_primary);
+
+	
+
+	printf("Expecting %s\n", expected->toString().c_str());
+	printf("Got %s\n", putted->toString().c_str());
+	TS_ASSERT_EQUALS(putted, expected);
+
+    // check that the nodes was written
+
+	Handle  c_primarycolor=L(INHERITANCE_LINK, c, pcolor),
+	get_link=L(GET_LINK, c_concept, c_primarycolor);
+
+
+	 putted = inst.execute(get_link);
+
+	 Handle num1=N(CONCEPT_NODE, "100"),
+	 		num2=N(CONCEPT_NODE, "010"),
+	 		num3=N(CONCEPT_NODE, "001"),
+	 		red=N(CONCEPT_NODE, "Red");
+	
+	 expected = L(SET_LINK, num1,num2,num3,red);
+
+	printf("Expecting %s\n", expected->toString().c_str());
+	printf("Got %s\n", putted->toString().c_str());
+	TS_ASSERT_EQUALS(putted, expected);
+
+logger().info("END TEST: %s", __FUNCTION__);
+ 
+
+}
+
+/**
+* This test is for the case where ChoiceLink is used to create complex patterns for grounding.
+*/
+
+ void PatternMatcherUTest :: test_ChoiceLink(void) 
+ {
+ 	logger().debug("BEGIN TEST: %s", __FUNCTION__);
+ 	as->clear();
+	eval->eval("(load-from-path \"/home/mika/mika/PatternMatcher.scm\")");
+
+	// Needed to define cog-execute!
+	eval->eval("(use-modules (opencog exec))");
+
+	Handle hgnd = eval->eval_h("(cog-execute! getcolors)");
+ 
+ 
+
+	
+ 	Handle hans = eval->eval_h("(SetLink 
+ 		(ConceptNode \"Blue\") 
+ 		(ConceptNode \"Green\")
+ 		(ConceptNode \"Red\")
+ 		(ConceptNode \"$color\")
+ 		(ConceptNode \"$X\")");
+		
+	
+	printf("Expected this: %s\n", hans->toString().c_str());
+	printf("Found this answer: %s\n", hgnd->toString().c_str());
+
+	TSM_ASSERT("Didn't get the expected grounding", hans == hgnd);
+
+	logger().debug("END TEST: %s", __FUNCTION__);
+
+ }

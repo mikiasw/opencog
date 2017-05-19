@@ -27,11 +27,15 @@ class MyTestCase(unittest.TestCase):
         #test whether the node is created or not
         self.test_cat_value =scheme_eval_h(self.atsp, "(ConceptNode \"Cat\")")
         self.assertEqual(self.test_cat_value,self.test_cat)
+        self.assertIsInstance(test_cat,Atom)
+
     def test_add_link(self):
         #test whether the link is created between the node
-       self.cat_animal=self.atsp.add_link(types.InheritanceLink,[self.test_cat,self.test_animal])
-       
-       self.assertEqual(InheritanceLink(self.test_cat,self.test_animal),self.cat_animal)
+        self.cat_animal=self.atsp.add_link(types.InheritanceLink,[self.test_cat,self.test_animal])
+
+        self.assertEqual(InheritanceLink(self.test_cat,self.test_animal),self.cat_animal)
+        self.assertIsInstance(self.cat_animal, Atom)
+
     def test_remove_node(self):
         #test whether the node that is crated is removed or not
        self.assertEqual(True,self.atsp.remove(self.test_cat))
